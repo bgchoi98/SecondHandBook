@@ -203,7 +203,9 @@ public class ChatroomController {
             String imageUrl = s3Service.uploadFile(image);
 
             result.put("success", true);
-            result.put("imageUrl", imageUrl);
+            result.put("imageUrl", imageUrl != null && imageUrl.startsWith("/")
+                    ? imageUrl
+                    : "/img/" + imageUrl);
         } catch (IOException e) {
             log.error("이미지 업로드 실패", e);
             result.put("success", false);

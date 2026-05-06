@@ -645,6 +645,9 @@
                             <c:when test="${post.board_img_url.startsWith('/')}">
                                 <img src="${pageContext.request.contextPath}${fn:escapeXml(post.board_img_url)}" alt="첨부 이미지">
                             </c:when>
+                            <c:otherwise>
+                                <img src="${pageContext.request.contextPath}/img/${fn:escapeXml(post.board_img_url)}" alt="泥⑤? ?대?吏">
+                            </c:otherwise>
                         </c:choose>
                     </div>
                 </c:if>

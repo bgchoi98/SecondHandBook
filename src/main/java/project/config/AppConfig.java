@@ -8,7 +8,10 @@ import org.springframework.context.support.PropertySourcesPlaceholderConfigurer;
 import org.springframework.web.client.RestTemplate;
 
 @Configuration
-@PropertySource("classpath:application.properties")
+@PropertySource(value = {
+        "classpath:application.properties",
+        "file:/srv/secondhandbook/config/application.properties"
+}, ignoreResourceNotFound = true)
 public class AppConfig {
     @Bean
     public RestTemplate restTemplate() {
@@ -22,6 +25,8 @@ public class AppConfig {
 
     @Bean
     public static PropertySourcesPlaceholderConfigurer propertySourcesPlaceholderConfigurer() {
-        return new PropertySourcesPlaceholderConfigurer();
+        PropertySourcesPlaceholderConfigurer configurer = new PropertySourcesPlaceholderConfigurer();
+        configurer.setIgnoreResourceNotFound(true);
+        return configurer;
     }
 }

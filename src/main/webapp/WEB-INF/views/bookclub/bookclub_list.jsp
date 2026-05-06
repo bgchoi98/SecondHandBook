@@ -136,7 +136,7 @@
                                                             <%-- S3 URL (http/https)는 그대로, 로컬 경로(/)는 contextPath 붙임 --%>
                                                             <c:choose>
                                                                 <c:when test="${club.banner_img_url.startsWith('http://') or club.banner_img_url.startsWith('https://')}">
-                                                                    <c:set var="bannerSrc" value="${club.banner_img_url}" />
+                                                                    <c:set var="bannerSrc" value="${pageContext.request.contextPath}/img/${club.banner_img_url}" />
                                                                 </c:when>
                                                                 <c:when test="${club.banner_img_url.startsWith('/')}">
                                                                     <c:set var="bannerSrc" value="${pageContext.request.contextPath}${club.banner_img_url}" />
