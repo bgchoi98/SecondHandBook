@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 import project.member.MemberVO;
+import project.util.Const;
 
 import javax.servlet.http.HttpSession;
 import java.util.List;
@@ -20,16 +21,14 @@ public class AddressController {
     @GetMapping("/list")
     @ResponseBody
     public List<AddressVO> getAddressList(HttpSession sess) {
-        MemberVO user = (MemberVO) sess.getAttribute("loginSess");
-        if (user == null) return null;
+        MemberVO user = (MemberVO) sess.getAttribute(Const.SESSION);
         return addressService.getAddressList(user.getMember_seq());
     }
 
     @PostMapping("/add")
     @ResponseBody
     public String addAddress(AddressVO vo, HttpSession sess) {
-        MemberVO user = (MemberVO) sess.getAttribute("loginSess");
-        if (user == null) return "fail";
+        MemberVO user = (MemberVO) sess.getAttribute(Const.SESSION);
 
         if (vo.getPost_no() == null || vo.getPost_no().trim().isEmpty()) {
             return "fail_post_no_required"; // 우편번호 필수 입력
@@ -54,8 +53,7 @@ public class AddressController {
     @PostMapping("/update")
     @ResponseBody
     public String updateAddress(AddressVO vo, HttpSession sess) {
-        MemberVO user = (MemberVO) sess.getAttribute("loginSess");
-        if (user == null) return "fail";
+        MemberVO user = (MemberVO) sess.getAttribute(Const.SESSION);
 
         // 우편번호가 비어있는지 또는 유효하지 않은 경우 체크
         if (vo.getPost_no() == null || vo.getPost_no().trim().isEmpty()) {
@@ -83,8 +81,7 @@ public class AddressController {
     @PostMapping("/setDefault")
     @ResponseBody
     public String setDefaultAddress(@RequestParam long addr_seq, HttpSession sess) {
-        MemberVO user = (MemberVO) sess.getAttribute("loginSess");
-        if (user == null) return "fail";
+        MemberVO user = (MemberVO) sess.getAttribute(Const.SESSION);
 
         boolean result = addressService.setMyDefaultAddress(user.getMember_seq(), addr_seq);
         return result ? "success" : "fail";

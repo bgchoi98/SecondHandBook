@@ -12,7 +12,6 @@ import project.member.MemberVO;
 import project.trade.TradeService;
 import project.trade.TradeVO;
 import project.util.Const;
-import project.util.LoginUtil;
 
 import javax.servlet.http.HttpSession;
 import java.util.List;
@@ -28,11 +27,6 @@ public class MypageController {
 
     @GetMapping("/mypage")
     public String mypage(HttpSession sess, Model model) {
-        MemberVO loginSess = (MemberVO) sess.getAttribute(Const.SESSION);
-        if (loginSess == null) {
-            return LoginUtil.redirectToLogin();
-        }
-
         model.addAttribute("currentTab", "profile");
         return "member/mypage";
     }
@@ -42,11 +36,6 @@ public class MypageController {
                                 @RequestParam(required = false) String status,
                                 HttpSession sess,
                                 Model model) {
-        MemberVO loginSess = (MemberVO) sess.getAttribute(Const.SESSION);
-        if (loginSess == null) {
-            return LoginUtil.redirectToLogin();
-        }
-
         model.addAttribute("currentTab", tab);
         model.addAttribute("status", status);
         return "member/mypage";
@@ -61,10 +50,6 @@ public class MypageController {
         log.info("=========loadTab 호출됨: tab={}, status={}", tab, status);
         // 로그인 체크
         MemberVO loginSess = (MemberVO) sess.getAttribute(Const.SESSION);
-        if(loginSess == null) {
-            return "error/401";
-        }
-
         Long member_seq = loginSess.getMember_seq();
         // 탭별 초기 데이터 로드 (SSR이 필요한 경우 여기서 처리)
         // 현재 대부분 AJAX로 처리하므로 비워두거나 기본값만 설정
@@ -109,7 +94,6 @@ public class MypageController {
     @ResponseBody
     public List<BookClubVO> getMyBookClubs(HttpSession sess) {
         MemberVO user = (MemberVO) sess.getAttribute(Const.SESSION);
-        if (user == null) return null;
 
         // BookClubService를 통해 데이터 조회
         return bookClubService.getMyBookClubs(user.getMember_seq());
@@ -119,7 +103,6 @@ public class MypageController {
     @ResponseBody
     public List<TradeVO> getWishTrades(HttpSession sess) {
         MemberVO user = (MemberVO) sess.getAttribute(Const.SESSION);
-        if (user == null) return null;
         return tradeService.getWishTrades(user.getMember_seq());
     }
 
@@ -128,7 +111,6 @@ public class MypageController {
     @ResponseBody
     public List<BookClubVO> getWishBookClubs(HttpSession sess) {
         MemberVO user = (MemberVO) sess.getAttribute(Const.SESSION);
-        if (user == null) return null;
         return bookClubService.getWishBookClubs(user.getMember_seq());
     }
 
