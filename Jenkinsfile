@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        DEPLOY_HOST = '192.168.219.101'
+        DEPLOY_HOST = '192.168.219.112'
         DEPLOY_TMP_WAR = '/tmp/ROOT.war'
         JAVA17_HOME = '/usr/lib/jvm/java-17-openjdk-amd64'
     }
