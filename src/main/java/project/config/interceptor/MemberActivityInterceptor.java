@@ -7,6 +7,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 import project.common.LogoutPendingManager;
 import project.common.UserType;
 import project.member.MemberVO;
+import project.util.Const;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -33,7 +34,7 @@ public class MemberActivityInterceptor implements HandlerInterceptor {
         HttpSession sess = request.getSession(false);
 
         if (sess != null) {
-            MemberVO memberVO = (MemberVO) sess.getAttribute("loginSess");
+            MemberVO memberVO = (MemberVO) sess.getAttribute(Const.SESSION);
 
             if (memberVO != null) {
                 // ★ 강제 로그아웃 체크 ★
