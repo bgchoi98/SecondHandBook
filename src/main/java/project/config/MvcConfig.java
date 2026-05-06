@@ -7,7 +7,6 @@ import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.*;
 import org.springframework.context.support.PropertySourcesPlaceholderConfigurer;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -26,7 +25,10 @@ import java.util.Properties;
 @ComponentScan(basePackages = { "project" })
 @EnableWebMvc
 @EnableTransactionManagement
-@PropertySource("classpath:application.properties")
+@PropertySource(value = {
+        "classpath:application.properties",
+        "file:/srv/secondhandbook/config/application.properties"
+}, ignoreResourceNotFound = true)
 public class MvcConfig implements WebMvcConfigurer {
 
     @Value("${db.driver}")
@@ -67,7 +69,7 @@ public class MvcConfig implements WebMvcConfigurer {
     @Bean
     public static PropertySourcesPlaceholderConfigurer propertyConfigurer() {
         PropertySourcesPlaceholderConfigurer configurer = new PropertySourcesPlaceholderConfigurer();
-        configurer.setLocation(new ClassPathResource("application.properties"));
+        configurer.setIgnoreResourceNotFound(true);
         return configurer;
     }
 
@@ -77,6 +79,12 @@ public class MvcConfig implements WebMvcConfigurer {
     // registry.addResourceHandler("/img/**").
     // addResourceLocations("file:" + uploadPath + "/");
     // }
+
+    @Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        registry.addResourceHandler("/img/**")
+                .addResourceLocations("file:" + uploadPath + "/");
+    }
 
     // hikaricp
     @Bean

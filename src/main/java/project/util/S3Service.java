@@ -1,173 +1,169 @@
 package project.util;
 
-
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-import software.amazon.awssdk.core.sync.RequestBody;
-import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class S3Service {
 
-    private final S3Client s3Client;
+    private static final String IMAGE_DIR = "images";
 
-    @Value("${AWS_S3_BUCKET}")
-    private String bucketName;
+    @Value("${file.dir}")
+    private String fileDir;
 
-    @Value("${AWS_S3_REGION}")
-    private String region;
-
-    @Value("${AWS_CLOUDFRONT_DOMAIN:}")
-    private String cloudFrontDomain;
-
-    // 단일 파일 업로드
     public String uploadFile(MultipartFile file) throws IOException {
-        if (file.isEmpty()) return null;
-
-        // 파일명 및 확장자 처리
-        String originalFilename = file.getOriginalFilename();
-        if (originalFilename == null) originalFilename = "file";
-        String ext = "";
-        int dotIndex = originalFilename.lastIndexOf(".");
-        if(dotIndex >= 0) ext = originalFilename.substring(dotIndex + 1);
-
-        // S3에 저장될 키 생성 (UUID 기반)
-        String key = "images/" + UUID.randomUUID() + (ext.isEmpty() ? "" : "." + ext);
-
-        // S3 업로드 요청
-        PutObjectRequest request = PutObjectRequest.builder()
-                .bucket(bucketName)
-                .key(key)
-                .contentType(file.getContentType())
-                .build();
-
-        s3Client.putObject(request, RequestBody.fromBytes(file.getBytes()));
-
-        // CloudFront URL 반환 (설정되어 있으면), 아니면 S3 URL
-        if (cloudFrontDomain != null && !cloudFrontDomain.isEmpty()) {
-            return String.format("https://%s/%s", cloudFrontDomain, key);
+        if (file == null || file.isEmpty()) {
+            return null;
         }
-        return String.format("https://%s.s3.%s.amazonaws.com/%s", bucketName, region, key);
+
+        Path uploadDir = getUploadDir();
+        Files.createDirectories(uploadDir);
+
+        String storeFileName = createStoreFileName(file.getOriginalFilename());
+        Path targetPath = uploadDir.resolve(storeFileName).normalize();
+        if (!targetPath.startsWith(uploadDir)) {
+            throw new IOException("Invalid upload path: " + targetPath);
+        }
+
+        Files.copy(file.getInputStream(), targetPath, StandardCopyOption.REPLACE_EXISTING);
+
+        String savedPath = IMAGE_DIR + "/" + storeFileName;
+        log.info("Local file uploaded: original={}, saved={}", file.getOriginalFilename(), savedPath);
+        return savedPath;
     }
 
-    // 다중 파일 업로드
     public List<String> storeFiles(List<MultipartFile> files) throws IOException {
         List<String> urls = new ArrayList<>();
+        if (files == null) {
+            return urls;
+        }
+
         for (MultipartFile file : files) {
-            if (!file.isEmpty()) {
-                urls.add(uploadFile(file));
+            String savedPath = uploadFile(file);
+            if (savedPath != null) {
+                urls.add(savedPath);
             }
         }
         return urls;
     }
 
-    // 단일 파일 삭제
     public void deleteFile(String key) {
-        s3Client.deleteObject(builder -> builder.bucket(bucketName).key(key).build());
+        if (key == null || key.trim().isEmpty()) {
+            return;
+        }
+
+        try {
+            Path targetPath = resolveLocalPath(key);
+            Files.deleteIfExists(targetPath);
+            log.info("Local file deleted: {}", key);
+        } catch (IOException | IllegalArgumentException e) {
+            log.warn("Failed to delete local file: {}, error={}", key, e.getMessage());
+        }
     }
 
-    // 다중 파일 삭제
     public void deleteFiles(List<String> keys) {
+        if (keys == null) {
+            return;
+        }
+
         for (String key : keys) {
             deleteFile(key);
         }
     }
 
-    // 만약 imgUrls 전체 URL이 있다면 key만 추출
     public void deleteFilesByUrls(List<String> urls) {
-        if (urls == null || urls.isEmpty()) return;
+        if (urls == null) {
+            return;
+        }
 
         for (String url : urls) {
             deleteByUrl(url);
         }
     }
 
-    /**
-     * URL을 받아서 안전하게 S3 파일을 삭제합니다.
-     *
-     * 보안 정책:
-     * 1. 우리 버킷(secondarybooksimages)의 URL만 삭제 허용
-     * 2. 올바른 region(ap-northeast-2) 확인
-     * 3. key prefix는 images/로 시작해야 함 (업로드 규칙과 일치)
-     *
-     * @param url 삭제할 S3 파일의 전체 URL
-     * @throws IllegalArgumentException URL 파싱 실패 또는 보안 정책 위반 시
-     */
     public void deleteByUrl(String url) {
-        // null/blank 체크
-        if (url == null || url.trim().isEmpty()) {
-            log.debug("Empty URL provided to deleteByUrl, skipping");
-            return;
+        deleteFile(extractLocalKey(url));
+    }
+
+    private Path getUploadDir() {
+        return Paths.get(fileDir).toAbsolutePath().normalize().resolve(IMAGE_DIR);
+    }
+
+    private Path resolveLocalPath(String key) throws IOException {
+        String normalizedKey = normalizeKey(key);
+        Path baseDir = Paths.get(fileDir).toAbsolutePath().normalize();
+        Path targetPath = baseDir.resolve(normalizedKey).normalize();
+
+        if (!targetPath.startsWith(baseDir)) {
+            throw new IOException("Path traversal is not allowed: " + key);
+        }
+        return targetPath;
+    }
+
+    private String extractLocalKey(String url) {
+        if (url == null) {
+            return null;
+        }
+
+        String value = url.trim();
+        if (value.isEmpty()) {
+            return value;
         }
 
         try {
-            // URI로 안전하게 파싱 (query string 자동 분리)
-            URI uri = new URI(url.trim());
-            String host = uri.getHost();
+            URI uri = new URI(value);
             String path = uri.getPath();
-
-            // 보안 검증 1: host가 우리 버킷 또는 CloudFront인지 확인
-            String expectedS3Host = String.format("%s.s3.%s.amazonaws.com", bucketName, region);
-            boolean isS3Url = host != null && host.equals(expectedS3Host);
-            boolean isCloudFrontUrl = host != null && cloudFrontDomain != null && host.equals(cloudFrontDomain);
-
-            if (!isS3Url && !isCloudFrontUrl) {
-                log.warn("Security violation: Attempted to delete file from unauthorized source. " +
-                        "URL={}, expected_s3_host={}, cloudfront_domain={}, actual_host={}",
-                        url, expectedS3Host, cloudFrontDomain, host);
-                throw new IllegalArgumentException(
-                    "Only files from bucket '" + bucketName + "' or CloudFront can be deleted"
-                );
+            if (path != null && !path.isEmpty()) {
+                return normalizeKey(path);
             }
-
-            // 보안 검증 2: path에서 key 추출 (leading slash 제거)
-            if (path == null || path.isEmpty() || path.equals("/")) {
-                log.warn("Invalid path in URL: {}", url);
-                throw new IllegalArgumentException("URL does not contain a valid file path");
-            }
-
-            String key = path.startsWith("/") ? path.substring(1) : path;
-
-            // 보안 검증 3: key가 허용된 prefix로 시작하는지 확인
-            // 현재 업로드는 images/ prefix를 사용하므로, 삭제도 동일한 prefix만 허용
-            if (!key.startsWith("images/")) {
-                log.warn("Security violation: Attempted to delete file outside allowed prefix. " +
-                        "URL={}, key={}, allowed_prefix=images/", url, key);
-                throw new IllegalArgumentException(
-                    "Only files with prefix 'images/' can be deleted. Provided key: " + key
-                );
-            }
-
-            // 보안 검증 4: path traversal 시도 차단
-            if (key.contains("..")) {
-                log.warn("Security violation: Path traversal attempt detected. URL={}, key={}", url, key);
-                throw new IllegalArgumentException("Path traversal is not allowed in key: " + key);
-            }
-
-            // 모든 검증 통과 - 삭제 실행
-            log.info("Deleting S3 file - URL: {}, Key: {}", url, key);
-            deleteFile(key);
-            log.info("Successfully deleted S3 file - Key: {}", key);
-
-        } catch (URISyntaxException e) {
-            log.error("Failed to parse URL: {}. Error: {}", url, e.getMessage());
-            throw new IllegalArgumentException("Invalid URL format: " + url, e);
-        } catch (Exception e) {
-            log.error("Failed to delete S3 file. URL: {}, Error: {}", url, e.getMessage());
-            throw new RuntimeException("Failed to delete S3 file: " + url, e);
+        } catch (URISyntaxException ignored) {
+            // Fall through and treat the value as an already-local key.
         }
+
+        return normalizeKey(value);
+    }
+
+    private String normalizeKey(String key) {
+        String normalized = key.replace("\\", "/");
+        if (normalized.startsWith("/img/")) {
+            normalized = normalized.substring("/img/".length());
+        } else if (normalized.startsWith("img/")) {
+            normalized = normalized.substring("img/".length());
+        } else if (normalized.startsWith("/")) {
+            normalized = normalized.substring(1);
+        }
+        return normalized;
+    }
+
+    private String createStoreFileName(String originalFilename) {
+        String ext = extractExtension(originalFilename);
+        return UUID.randomUUID() + (ext.isEmpty() ? "" : "." + ext);
+    }
+
+    private String extractExtension(String originalFilename) {
+        if (originalFilename == null) {
+            return "";
+        }
+
+        String filename = Paths.get(originalFilename).getFileName().toString();
+        int dotIndex = filename.lastIndexOf('.');
+        if (dotIndex < 0 || dotIndex == filename.length() - 1) {
+            return "";
+        }
+        return filename.substring(dotIndex + 1);
     }
 }
