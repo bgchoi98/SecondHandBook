@@ -1,6 +1,14 @@
 const BookClub = (() => {
 
     let debounceTimer = null;
+
+    function resolveImageUrl(url) {
+        if (!url) return "";
+        if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("/")) {
+            return url;
+        }
+        return "/img/" + url;
+    }
     let currentSort = "latest"; // 기본 정렬: 최신순
     let currentPage = 0;        // 현재 페이지 (0부터 시작)
     let pageData = null;        // 현재 페이지 데이터
@@ -93,7 +101,7 @@ const BookClub = (() => {
                         <div class="card-banner">
                             ${
                                 club.banner_img_url
-                                    ? `<img src="${club.banner_img_url}" alt="${club.book_club_name} 배너">`
+                                    ? `<img src="${resolveImageUrl(club.banner_img_url)}" alt="${club.book_club_name} 배너">`
                                     : `<div class="card-banner-placeholder"><span>📚</span></div>`
                             }
                         </div>

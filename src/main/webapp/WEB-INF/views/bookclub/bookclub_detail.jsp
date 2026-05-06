@@ -42,7 +42,9 @@
                                                         </c:when>
                                                         <%-- 그 외 --%>
                                                             <c:otherwise>
-                                                                <div class="bc-hero-gradient"></div>
+                                                                <img class="bc-hero-background"
+                                                                    src="${pageContext.request.contextPath}/img/${fn:escapeXml(bookClub.banner_img_url)}"
+                                                                    alt="${fn:escapeXml(bookClub.book_club_name)} 諛곕꼫">
                                                             </c:otherwise>
                                             </c:choose>
                                         </c:when>
